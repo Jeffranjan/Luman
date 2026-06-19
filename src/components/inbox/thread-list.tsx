@@ -33,7 +33,7 @@ export function ThreadList() {
       utils.inbox.getThreads.setData(undefined, context?.previousThreads);
     },
     onSettled: () => {
-      utils.inbox.getThreads.invalidate();
+      void utils.inbox.getThreads.invalidate();
     },
   });
 
@@ -50,7 +50,7 @@ export function ThreadList() {
       utils.inbox.getThreads.setData(undefined, context?.previousThreads);
     },
     onSettled: () => {
-      utils.inbox.getThreads.invalidate();
+      void utils.inbox.getThreads.invalidate();
     },
   });
 
@@ -67,7 +67,7 @@ export function ThreadList() {
       utils.inbox.getThreads.setData(undefined, context?.previousThreads);
     },
     onSettled: () => {
-      utils.inbox.getThreads.invalidate();
+      void utils.inbox.getThreads.invalidate();
     },
   });
 

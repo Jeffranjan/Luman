@@ -1,9 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getTenant } from "~/server/corsair-tenant";
-import { summarizeThread, draftEmail, draftReply } from "~/server/agents/agent";
-import { emailThreads } from "~/server/db/schema";
-import { eq } from "drizzle-orm";
+import { draftEmail } from "~/server/agents/agent";
 
 export const aiRouter = createTRPCRouter({
   /**
@@ -57,7 +55,7 @@ export const aiRouter = createTRPCRouter({
             response: `Here's a summary of your latest ${summaries.length} threads:\n\n${summaries.join("\n")}\n\nWould you like me to do anything with these?`,
             action: { type: "show_threads", data: threads.slice(0, 5) },
           };
-        } catch (e) {
+        } catch {
           return {
             response:
               "I couldn't access your inbox. Please make sure Gmail is connected.",
@@ -110,7 +108,7 @@ export const aiRouter = createTRPCRouter({
             response: `Found ${filtered.length} emails matching "${searchTerms}":\n\n${results.join("\n")}\n\nWould you like me to open one of these?`,
             action: { type: "search_results", data: filtered.slice(0, 5) },
           };
-        } catch (e) {
+        } catch {
           return { response: "Search failed. Please try again.", action: null };
         }
       }
@@ -139,7 +137,7 @@ export const aiRouter = createTRPCRouter({
               data: { body: draft, to: "", subject: "Draft" },
             },
           };
-        } catch (e) {
+        } catch {
           return {
             response: "I couldn't generate a draft. Please try again.",
             action: null,
@@ -185,7 +183,7 @@ export const aiRouter = createTRPCRouter({
             response: `Here are your upcoming events:\n\n${eventList.join("\n")}\n\nWould you like me to create a new event or modify one?`,
             action: { type: "show_events", data: events.slice(0, 5) },
           };
-        } catch (e) {
+        } catch {
           return {
             response:
               "I couldn't access your calendar. Please make sure Google Calendar is connected.",
@@ -224,12 +222,7 @@ export const aiRouter = createTRPCRouter({
         message: z.string(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
-      // For now, delegate to the chat procedure
-      const userId = ctx.session.user.id;
-      const tenant = await getTenant(userId);
-
-      // Simple echo for streaming demo
+    .mutation(async ({ input }) => {
       return {
         response: `Processing: "${input.message}"... I'm working on understanding your request. This feature is being enhanced with full streaming support.`,
         done: true,

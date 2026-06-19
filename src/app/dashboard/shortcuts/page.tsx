@@ -1,7 +1,7 @@
 "use client";
 
 import { Keyboard } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 const shortcutGroups = [
   {

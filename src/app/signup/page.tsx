@@ -5,7 +5,6 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import { Mail, Loader2 } from "lucide-react";
 import { authClient } from "~/server/better-auth/client";
-import { useRouter } from "next/navigation";
 
 export default function SignUpPage() {
   const router = useRouter();

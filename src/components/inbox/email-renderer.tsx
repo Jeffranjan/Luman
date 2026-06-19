@@ -249,8 +249,8 @@ function splitQuotedContent(
 
     // Try to find the split point
     for (const pattern of gmailQuotePatterns) {
-      const match = content.match(pattern);
-      if (match && match.index !== undefined && match.index > 0) {
+      const match = pattern.exec(content);
+      if (match?.index !== undefined && match.index > 0) {
         return {
           mainContent: content.substring(0, match.index),
           quotedContent: content.substring(match.index),
@@ -259,12 +259,8 @@ function splitQuotedContent(
     }
 
     // Try splitting at blockquote
-    const blockquoteMatch = content.match(/<blockquote[^>]*>/i);
-    if (
-      blockquoteMatch &&
-      blockquoteMatch.index !== undefined &&
-      blockquoteMatch.index > 100
-    ) {
+    const blockquoteMatch = /<blockquote[^>]*>/i.exec(content);
+    if (blockquoteMatch?.index !== undefined && blockquoteMatch.index > 100) {
       return {
         mainContent: content.substring(0, blockquoteMatch.index),
         quotedContent: content.substring(blockquoteMatch.index),

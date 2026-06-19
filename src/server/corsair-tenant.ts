@@ -2,7 +2,7 @@ import { setupCorsair } from "corsair";
 import { corsair } from "./corsair";
 import { db } from "./db";
 import { corsairAccounts, users } from "./db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 /**
  * Resolve the Corsair tenant ID for a given user.

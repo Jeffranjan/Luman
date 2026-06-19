@@ -31,14 +31,14 @@ export function ThreadView({ threadId }: { threadId: string }) {
 
   const archiveMutation = api.inbox.archiveThread.useMutation({
     onSuccess: () => {
-      utils.inbox.getThreads.invalidate();
+      void utils.inbox.getThreads.invalidate();
       router.push("/dashboard");
     },
   });
 
   const deleteMutation = api.inbox.deleteThread.useMutation({
     onSuccess: () => {
-      utils.inbox.getThreads.invalidate();
+      void utils.inbox.getThreads.invalidate();
       router.push("/dashboard");
     },
   });
@@ -47,7 +47,7 @@ export function ThreadView({ threadId }: { threadId: string }) {
     onSuccess: () => {
       setReplyText("");
       setShowReply(false);
-      utils.inbox.getThread.invalidate({ threadId });
+      void utils.inbox.getThread.invalidate({ threadId });
     },
   });
 

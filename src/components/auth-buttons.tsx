@@ -2,11 +2,9 @@
 
 import * as React from "react";
 import { authClient } from "~/server/better-auth/client";
-import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
 export function SignInPanel() {
-  const router = useRouter();
   const [mode, setMode] = React.useState<"login" | "register">("login");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -176,13 +174,11 @@ export function SignInPanel() {
 }
 
 export function SignOutButton() {
-  const router = useRouter();
-
   const handleSignOut = async () => {
     await authClient.signOut({
       fetchOptions: {
         onSuccess: () => {
-          router.refresh();
+          window.location.href = "/";
         },
       },
     });

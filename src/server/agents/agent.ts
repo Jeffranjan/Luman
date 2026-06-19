@@ -17,7 +17,7 @@ interface ChatMessage {
 
 async function callMiMo(
   messages: ChatMessage[],
-  maxTokens: number = 500,
+  maxTokens = 500,
 ): Promise<string> {
   const url = `${MIMO_BASE_URL}/chat/completions`;
   console.log(`[MiMo] Calling ${url} with model ${MIMO_MODEL}`);

@@ -19,13 +19,13 @@ interface ThreadRowProps {
 }
 
 export function ThreadRow({
-  id,
+  id: _id,
   subject,
   snippet,
   from,
   date,
   unread,
-  priority,
+  priority: _priority,
   pinned,
   isSelected,
   onClick,
