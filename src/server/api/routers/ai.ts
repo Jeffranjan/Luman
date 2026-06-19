@@ -1,12 +1,133 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getTenant } from "~/server/corsair-tenant";
-import { draftEmail } from "~/server/agents/agent";
+import { runAgent } from "~/server/agents/agent";
+import type { AgentResult } from "~/server/agents/agent";
 
 export const aiRouter = createTRPCRouter({
   /**
-   * Chat with the AI assistant — processes natural language commands
-   * and executes tools (search emails, draft, schedule, etc.)
+   * Main agent endpoint — processes natural language with tool calling.
+   * Returns structured results (draft, search, calendar, etc.) instead of plain text.
+   */
+  agent: protectedProcedure
+    .input(
+      z.object({
+        message: z.string(),
+        history: z
+          .array(
+            z.object({
+              role: z.enum(["user", "assistant"]),
+              content: z.string(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }): Promise<AgentResult> => {
+      const userId = ctx.session.user.id;
+      const tenant = await getTenant(userId);
+
+      try {
+        const result = await runAgent(input.message, input.history ?? [], {
+          tenant,
+          userId,
+          db: ctx.db,
+        });
+        return result;
+      } catch (error: any) {
+        console.error("[AI Agent] Error:", error?.message ?? error);
+        return {
+          type: "text",
+          data: {},
+          message: "Something went wrong. Please try again.",
+        };
+      }
+    }),
+
+  /**
+   * Confirm and send an email (called after user reviews the draft).
+   */
+  confirmSend: protectedProcedure
+    .input(
+      z.object({
+        to: z.string(),
+        subject: z.string(),
+        body: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const tenant = await getTenant(userId);
+
+      const raw = [
+        `To: ${input.to}`,
+        `Subject: ${input.subject}`,
+        "Content-Type: text/plain; charset=utf-8",
+        "",
+        input.body,
+      ].join("\r\n");
+
+      const encoded = Buffer.from(raw).toString("base64url");
+
+      try {
+        const sent = await (tenant as any).gmail.api.messages.send({
+          raw: encoded,
+        });
+        return { success: true, messageId: sent?.id };
+      } catch (error: any) {
+        console.error("[AI Agent] Send failed:", error?.message ?? error);
+        return { success: false, error: "Failed to send email." };
+      }
+    }),
+
+  /**
+   * Confirm and create a calendar event (called after user reviews).
+   */
+  confirmCreateEvent: protectedProcedure
+    .input(
+      z.object({
+        title: z.string(),
+        startDateTime: z.string(),
+        endDateTime: z.string(),
+        description: z.string().optional(),
+        attendees: z.array(z.string()).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const tenant = await getTenant(userId);
+
+      try {
+        const event = await (tenant as any).googlecalendar.api.events.insert({
+          calendarId: "primary",
+          resource: {
+            summary: input.title,
+            description: input.description ?? "",
+            start: { dateTime: input.startDateTime },
+            end: { dateTime: input.endDateTime },
+            attendees: (input.attendees ?? []).map((email) => ({ email })),
+            conferenceData: {
+              createRequest: { requestId: `meet-${Date.now()}` },
+            },
+          },
+          conferenceDataVersion: 1,
+        });
+        return {
+          success: true,
+          eventId: event?.id,
+          hangoutLink: event?.hangoutLink ?? null,
+        };
+      } catch (error: any) {
+        console.error(
+          "[AI Agent] Calendar create failed:",
+          error?.message ?? error,
+        );
+        return { success: false, error: "Failed to create event." };
+      }
+    }),
+
+  /**
+   * Legacy chat endpoint — kept for backward compatibility.
    */
   chat: protectedProcedure
     .input(
@@ -22,210 +143,22 @@ export const aiRouter = createTRPCRouter({
           .optional(),
       }),
     )
-    .mutation(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }): Promise<AgentResult> => {
       const userId = ctx.session.user.id;
       const tenant = await getTenant(userId);
-      const message = input.message.toLowerCase();
 
-      // Tool: Summarize inbox
-      if (
-        message.includes("summarize") &&
-        (message.includes("inbox") || message.includes("unread"))
-      ) {
-        try {
-          const threads = await (tenant as any).gmail.db.threads.search({
-            limit: 10,
-          });
-          if (!Array.isArray(threads) || threads.length === 0) {
-            return {
-              response: "Your inbox is empty! No emails to summarize.",
-              action: null,
-            };
-          }
-
-          const summaries: string[] = [];
-          for (const thread of threads.slice(0, 5)) {
-            const data = thread.data ?? {};
-            summaries.push(
-              `• ${data.snippet?.substring(0, 80) ?? "No preview"}...`,
-            );
-          }
-
-          return {
-            response: `Here's a summary of your latest ${summaries.length} threads:\n\n${summaries.join("\n")}\n\nWould you like me to do anything with these?`,
-            action: { type: "show_threads", data: threads.slice(0, 5) },
-          };
-        } catch {
-          return {
-            response:
-              "I couldn't access your inbox. Please make sure Gmail is connected.",
-            action: null,
-          };
-        }
-      }
-
-      // Tool: Search emails
-      if (
-        message.includes("find") ||
-        message.includes("search") ||
-        message.includes("look for")
-      ) {
-        try {
-          const threads = await (tenant as any).gmail.db.threads.search({
-            limit: 50,
-          });
-          if (!Array.isArray(threads)) {
-            return {
-              response:
-                "I couldn't search your emails. Please make sure Gmail is connected.",
-              action: null,
-            };
-          }
-
-          // Extract search terms from the message
-          const searchTerms = input.message
-            .replace(/^(find|search|look for)\s+/i, "")
-            .toLowerCase();
-          const filtered = threads.filter((t: any) => {
-            const data = t.data ?? {};
-            const snippet = (data.snippet ?? "").toLowerCase();
-            return snippet.includes(searchTerms);
-          });
-
-          if (filtered.length === 0) {
-            return {
-              response: `I couldn't find any emails matching "${searchTerms}". Try a different search term.`,
-              action: null,
-            };
-          }
-
-          const results = filtered.slice(0, 5).map((t: any, i: number) => {
-            const data = t.data ?? {};
-            return `${i + 1}. ${data.snippet?.substring(0, 100) ?? "No preview"}...`;
-          });
-
-          return {
-            response: `Found ${filtered.length} emails matching "${searchTerms}":\n\n${results.join("\n")}\n\nWould you like me to open one of these?`,
-            action: { type: "search_results", data: filtered.slice(0, 5) },
-          };
-        } catch {
-          return { response: "Search failed. Please try again.", action: null };
-        }
-      }
-
-      // Tool: Draft email
-      if (
-        message.includes("draft") ||
-        message.includes("write") ||
-        message.includes("compose")
-      ) {
-        try {
-          const context = input.message.replace(
-            /^(draft|write|compose)\s+(an?\s+)?(email\s+)?(to\s+)?/i,
-            "",
-          );
-          const draft = await draftEmail(
-            context,
-            "recipient",
-            "Regarding your request",
-          );
-
-          return {
-            response: `Here's a draft:\n\n${draft}\n\nWould you like me to edit this or send it?`,
-            action: {
-              type: "draft",
-              data: { body: draft, to: "", subject: "Draft" },
-            },
-          };
-        } catch {
-          return {
-            response: "I couldn't generate a draft. Please try again.",
-            action: null,
-          };
-        }
-      }
-
-      // Tool: Calendar events
-      if (
-        message.includes("meeting") ||
-        message.includes("calendar") ||
-        message.includes("event") ||
-        message.includes("schedule")
-      ) {
-        try {
-          const events = await (tenant as any).googlecalendar.db.events.search({
-            limit: 10,
-          });
-          if (!Array.isArray(events) || events.length === 0) {
-            return {
-              response:
-                "No upcoming events found. Would you like me to create one?",
-              action: null,
-            };
-          }
-
-          const eventList = events.slice(0, 5).map((e: any, i: number) => {
-            const data = e.data ?? {};
-            const start = data.start?.dateTime ?? data.start?.date ?? "";
-            const time = start
-              ? new Date(start).toLocaleString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })
-              : "TBD";
-            return `${i + 1}. ${data.summary ?? "Untitled"} — ${time}`;
-          });
-
-          return {
-            response: `Here are your upcoming events:\n\n${eventList.join("\n")}\n\nWould you like me to create a new event or modify one?`,
-            action: { type: "show_events", data: events.slice(0, 5) },
-          };
-        } catch {
-          return {
-            response:
-              "I couldn't access your calendar. Please make sure Google Calendar is connected.",
-            action: null,
-          };
-        }
-      }
-
-      // Tool: Archive / Delete
-      if (
-        message.includes("archive") ||
-        message.includes("delete") ||
-        message.includes("trash")
-      ) {
+      try {
+        return await runAgent(input.message, input.history ?? [], {
+          tenant,
+          userId,
+          db: ctx.db,
+        });
+      } catch (error: any) {
         return {
-          response:
-            "I can help with that! Please specify which email you'd like to archive or delete. You can also select an email in your inbox and press `E` to archive or `#` to delete.",
-          action: null,
+          type: "text",
+          data: {},
+          message: "Something went wrong. Please try again.",
         };
       }
-
-      // Default: General AI response
-      return {
-        response: `I can help you with:\n\n• **Summarize inbox** — Get a quick overview of your emails\n• **Search emails** — Find specific messages\n• **Draft email** — Write a new email\n• **Check calendar** — See upcoming events\n• **Schedule meeting** — Create a new event\n\nWhat would you like to do?`,
-        action: null,
-      };
-    }),
-
-  /**
-   * Streaming chat — returns a simple response for now.
-   * Can be upgraded to real streaming later.
-   */
-  chatStream: protectedProcedure
-    .input(
-      z.object({
-        message: z.string(),
-      }),
-    )
-    .mutation(async ({ input }) => {
-      return {
-        response: `Processing: "${input.message}"... I'm working on understanding your request. This feature is being enhanced with full streaming support.`,
-        done: true,
-      };
     }),
 });

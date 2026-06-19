@@ -81,7 +81,7 @@ export function Sidebar() {
               className="text-sm font-semibold tracking-tight"
               style={{ color: "var(--text)" }}
             >
-              Corsair
+              Luman
             </span>
           </div>
 

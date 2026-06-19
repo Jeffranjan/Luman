@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
 import { Mail, Loader2 } from "lucide-react";
 import { authClient } from "~/server/better-auth/client";
 

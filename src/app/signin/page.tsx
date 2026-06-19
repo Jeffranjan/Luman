@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
+import { useRouter } from "next/navigation";
 import { Mail, Loader2 } from "lucide-react";
 import { authClient } from "~/server/better-auth/client";
 
@@ -77,7 +78,7 @@ export default function SignInPage() {
               Welcome back
             </h1>
             <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              Sign in to your Corsair account
+              Sign in to your Luman account
             </p>
           </div>
 

@@ -16,6 +16,8 @@ import { useTheme } from "next-themes";
 
 export default function LandingPage() {
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
   return (
     <div
@@ -60,7 +62,7 @@ export default function LandingPage() {
                 className="text-sm font-semibold"
                 style={{ color: "var(--text)" }}
               >
-                Corsair
+                Luman
               </span>
             </div>
 
@@ -95,7 +97,7 @@ export default function LandingPage() {
                   e.currentTarget.style.background = "transparent";
                 }}
               >
-                {theme === "dark" ? "☀️" : "🌙"}
+                {mounted ? (theme === "dark" ? "☀️" : "🌙") : "🌙"}
               </button>
               <Link
                 href="/signin"
@@ -174,7 +176,7 @@ export default function LandingPage() {
           style={{ color: "var(--text-secondary)" }}
         >
           Connect Gmail and Calendar. Describe what you want in plain language.
-          Corsair executes the work and waits for your approval.
+          Luman executes the work and waits for your approval.
         </motion.p>
 
         <motion.div
@@ -658,11 +660,11 @@ export default function LandingPage() {
               className="text-xs font-medium"
               style={{ color: "var(--text-secondary)" }}
             >
-              Corsair
+              Luman
             </span>
           </div>
           <span className="text-xs" style={{ color: "var(--text-tertiary)" }}>
-            © 2026 Corsair. All rights reserved.
+            © 2026 Luman. All rights reserved.
           </span>
         </div>
       </footer>

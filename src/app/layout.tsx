@@ -14,9 +14,9 @@ const robotoHeading = Roboto({
 const montserrat = Montserrat({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "Corsair — AI Command Center",
+  title: "Luman — AI Command Center",
   description:
-    "Your AI employee for email & calendar. Connect Gmail and Calendar, describe what you want, and Corsair executes.",
+    "Your AI employee for email & calendar. Connect Gmail and Calendar, describe what you want, and Luman executes.",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
